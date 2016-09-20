@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from collections import Counter
+import operator
+import functools
 
 
 def invert(mapping):
@@ -24,9 +26,13 @@ def invert(mapping):
 
 class Distribution(Counter):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name=None, *args, **kwargs):
         self._normalized = [False, {}]
+        self.name = name 
         super().__init__(*args, **kwargs)
+
+    def __hash__(self):
+        return id(self)
 
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
@@ -55,12 +61,36 @@ class Distribution(Counter):
         return '{}({})'.format(name, items)
 
 
+class Suite(Distribution):
+
+    def P(self, key):
+        for k, v in self.normalized().items():
+            if k.name == key:
+                return v
+
+    def hypo(self, h):
+        for k in self:
+            if k.name == h:
+                return k
+
+    def joined(self):
+        x = Distribution()
+        x.update(functools.reduce(operator.add, self.keys()))
+        return x
+
+    def normalizer(self, key):
+        return self.joined().P(key)
+
 if __name__ == "__main__":
 
-    bowls = {'bowl_1': Distribution({'chocolate': 10, 'vanilla': 30}),
-             'bowl_2': Distribution({'chocolate': 20, 'vanilla': 20})}
+    b1 = Distribution('bowl 1', {'chocolate': 10, 'vanilla': 30})
+    b2 = Distribution('bowl 2', {'chocolate': 20, 'vanilla': 20})
+    
+    bs = Suite('bowls')
+    bs.update([b1, b2])
 
-    flavours = invert(bowls)
+    D = 'vanilla'
+    H = 'bowl 1'
+    print((bs.P(H) * bs.hypo(H).P(D)) / bs.normalizer(D))
+    print()
 
-    # P(bowl_1) * P(chocolate | bowl_1)
-    print(((1 / len(bowls)) * bowls['bowl_1'].P('vanilla')))

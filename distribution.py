@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from collections import Counter
-import operator
-import functools
+# from collections import Counter
+from collections.abc import MutableMapping, Mapping
+# import operator
+# import functools
 
 
 def invert(mapping):
@@ -24,73 +25,65 @@ def invert(mapping):
     return new_map
 
 
-class Distribution(Counter):
+class Distribution(MutableMapping):
 
-    def __init__(self, name=None, *args, **kwargs):
-        self._normalized = [False, {}]
-        self.name = name 
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        self.update(*args, **kwargs)
+
+    def __len__(self):
+        return len(self.__dict__)
+
+    def __getitem__(self, key):
+        return self.__dict__.get(key, 0)
+
+    def __setitem__(self, key, value):
+        if not isinstance(value, (int, float)):
+            raise ValueError('value must be int or float')
+        else:
+            self.__dict__[key] = self.__dict__.get(key, 0) + value
+
+    def __delitem__(self, key):
+        del self.__dict__[key]
+
+    def __iter__(self):
+        return iter(self.__dict__)
+
+    def __contains__(self, item):
+        return item in self.__dict__
+
+    def update(self, *args, **kwargs):
+        d = self.__dict__
+        if args:
+            if isinstance(args[0], Mapping):
+                for k, v in args[0].items():
+                    d[k] = d.get(k, 0) + v
+            else:
+                for k in args:
+                    d[k] = d.get(k, 0) + 1
+        if kwargs:
+            for k, v in kwargs.items():
+                d[k] = d.get(k, 0) + v
 
     def __hash__(self):
         return id(self)
 
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-        self._normalized[0] = True
-
-    def update(self, *args, **kwargs):
-        super().update(*args, **kwargs)
-        self._normalized[0] = True
-
-    def normalized(self):
-        state, content = self._normalized
-        if (not state) or (not content):
-            total = sum(self.values())
-            for k, v in self.items():
-                content[k] = v / total
-        state = True
-        self._normalized = state, content
-        return content
-
-    def P(self, key):
-        return self.normalized().get(key, 0)
-
     def __repr__(self):
         name = self.__class__.__name__
-        items = ', '.join(["('{}', {})".format(k, v) for k, v in iter(self.items())])
-        return '{}({})'.format(name, items)
+        if not self:
+            return '{}()'.format(name)
+        else:
+            items = ', '.join(["('{}', {})".format(k, v) for k, v in iter(self.__dict__.items())])
+            return '{}({})'.format(name, items)
 
-
-class Suite(Distribution):
-
-    def P(self, key):
-        for k, v in self.normalized().items():
-            if k.name == key:
-                return v
-
-    def hypo(self, h):
-        for k in self:
-            if k.name == h:
-                return k
-
-    def joined(self):
-        x = Distribution()
-        x.update(functools.reduce(operator.add, self.keys()))
-        return x
-
-    def normalizer(self, key):
-        return self.joined().P(key)
+    def __add__(self, other):
+        new = Distribution(self.__dict__)
+        if isinstance(other, Distribution):
+            new.update(other)
+            return new
+        else:
+            raise TypeError
 
 if __name__ == "__main__":
 
     b1 = Distribution('bowl 1', {'chocolate': 10, 'vanilla': 30})
     b2 = Distribution('bowl 2', {'chocolate': 20, 'vanilla': 20})
-    
-    bs = Suite('bowls')
-    bs.update([b1, b2])
-
-    D = 'vanilla'
-    H = 'bowl 1'
-    print((bs.P(H) * bs.hypo(H).P(D)) / bs.normalizer(D))
-    print()
-

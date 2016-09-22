@@ -115,16 +115,3 @@ class Distribution(MutableMapping):
 
     def sort(self):
         return sorted(self._d.items(), key=lambda x: x[1], reverse=True)
-
-
-
-
-if __name__ == "__main__":
-
-    b1 = Distribution({'chocolate': 10, 'vanilla': 30})
-    b2 = Distribution((('chocolate', 20), ('vanilla', 20)))
-    b3 = Distribution(chocolate=30, vanilla=10)
-    b4 = dict((('chocolate', 5), ('vanilla', 5)))
-
-    b1 += b2
-    print(b1.sort())

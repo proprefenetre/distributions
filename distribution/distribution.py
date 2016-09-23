@@ -28,7 +28,6 @@ def invert(mapping):
 class Distribution(MutableMapping):
 
     def __init__(self, *args, **kwargs):
-        self.normalized = False
         self._d = {}
         self.update(*args, **kwargs)
 
@@ -84,15 +83,10 @@ class Distribution(MutableMapping):
 
     def values(self):
         return self._d.values()
-    
-    def total(self):
-        return sum(self.values())
 
-    def normalize(self):
-        total = self.total()
-        f = 1 / total
-        for k in self._d:
-            self._d[k] *= f
+    def total(self):
+        self.total = sum(self.values())
+        return self.total
 
     def __add__(self, other):
         if isinstance(other, Distribution):
@@ -108,10 +102,29 @@ class Distribution(MutableMapping):
         if isinstance(other, Distribution):
             for k, v in other.items():
                     self._d[k] += v
-            return self
         else:
             raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
                 self.__class__.__name__, other.__class__.__name__))
 
     def sort(self):
         return sorted(self._d.items(), key=lambda x: x[1], reverse=True)
+
+
+class ProbDistribution(Distribution):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.normalize()
+
+    def normalize(self):
+        total = self.total()
+        f = 1 / total
+        for k in self._d:
+            self._d[k] *= f
+
+if __name__ == "__main__":
+    d1 = Distribution({'chocolate': 10, 'vanilla': 20})
+    d2 = ProbDistribution(d1)
+
+    print(d1)
+    print(d2)

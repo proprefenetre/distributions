@@ -58,7 +58,7 @@ class Distribution(MutableMapping):
             if isinstance(it, Mapping):
                 for k, v in it.items():
                     self._d[k] = self._d.get(k, 0) + v
-            elif isinstance(it, (list, tuple)) and isinstance(it[0], tuple):
+            elif it and isinstance(it, (list, tuple)) and isinstance(it[0], tuple):
                 for k, v in it:
                     self._d[k] = self._d.get(k, 0) + v
             else:
@@ -85,13 +85,13 @@ class Distribution(MutableMapping):
         return self._d.values()
 
     def total(self):
-        self.total = sum(self.values())
-        return self.total
+        self._total = sum(self.values())
+        return self._total
 
     def __add__(self, other):
         if isinstance(other, Distribution):
             self.update(other)
-            return self
+            return Distribution(self)
         else:
             raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
                 self.__class__.__name__, other.__class__.__name__))
@@ -102,19 +102,13 @@ class Distribution(MutableMapping):
         if isinstance(other, Distribution):
             for k, v in other.items():
                     self._d[k] += v
+            return self
         else:
             raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
                 self.__class__.__name__, other.__class__.__name__))
 
-    def sort(self):
-        return sorted(self._d.items(), key=lambda x: x[1], reverse=True)
-
-
-class ProbDistribution(Distribution):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.normalize()
+    def sort(self, rev=True):
+        return sorted(self._d.items(), key=lambda x: x[1], reverse=rev)
 
     def normalize(self):
         total = self.total()
@@ -122,9 +116,33 @@ class ProbDistribution(Distribution):
         for k in self._d:
             self._d[k] *= f
 
-if __name__ == "__main__":
-    d1 = Distribution({'chocolate': 10, 'vanilla': 20})
-    d2 = ProbDistribution(d1)
+    def most_common(self, n=10):
+        pass
 
-    print(d1)
-    print(d2)
+    def most_likely(self, n=10):
+        pass
+
+
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    def get_books(n=0):
+        data_dir = Path('/home/niels/projects/python/bouquet/data')
+        books = [b for b in data_dir.glob('*/*') if b.suffix == '.txt']
+        text = []
+        if n > len(books):
+            print('{} books available, using all books'.format(len(books)))
+        for idx, book in enumerate(books):
+            if n > 0 and idx >= n:
+                break
+            else:
+                with book.open() as f:
+                    text.append(f.read())
+        return text
+
+    text = get_books()
+    corpus = Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
+    corpus.normalize()
+    print(corpus.sort(False))

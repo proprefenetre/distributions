@@ -1,10 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# from collections import Counter
 from collections.abc import MutableMapping, Mapping
-# import operator
-# import functools
+import statistics
+import operator
+from functools import reduce
+
+def bayes_t(prior, likelihood, c):
+    return (prior * likelihood) / c
+
+
+def product(it):
+    return reduce(operator.mul, it) 
 
 
 def invert(mapping):
@@ -31,6 +38,9 @@ class Distribution(MutableMapping):
         self._d = {}
         self.update(*args, **kwargs)
 
+    def __hash__(self):
+        return id(self)
+
     def __len__(self):
         return len(self._d)
 
@@ -52,19 +62,27 @@ class Distribution(MutableMapping):
     def __contains__(self, item):
         return item in self._d
 
+    def add(self, item, val=1):
+        self._d[item] = self._d.get(item, 0) + val
+
     def update(self, *args, **kwargs):
         if args:
             it = args[0]
             if isinstance(it, Mapping):
                 for k, v in it.items():
-                    self._d[k] = self._d.get(k, 0) + v
+                    self.add(k, v)
             elif it and isinstance(it, (list, tuple)) and isinstance(it[0], tuple):
                 for k, v in it:
-                    self._d[k] = self._d.get(k, 0) + v
-            else:
+                    self.add(k, v)
+            elif isinstance(it, (list, tuple)):
                 for k in it:
-                    self._d[k] = self._d.get(k, 0) + 1
+                    self.add(k)
+            else:
+                self.add(it)
+
         if kwargs:
+            if 'name' in kwargs:
+                self.name = kwargs.pop('name')
             self.update(kwargs)
 
     def __repr__(self):
@@ -85,64 +103,112 @@ class Distribution(MutableMapping):
         return self._d.values()
 
     def total(self):
-        self._total = sum(self.values())
-        return self._total
+        return sum(self.values())
 
     def __add__(self, other):
-        if isinstance(other, Distribution):
-            self.update(other)
-            return Distribution(self)
-        else:
+        if not isinstance(other, Distribution):
             raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
                 self.__class__.__name__, other.__class__.__name__))
+
+        self.update(other)
+        return Distribution(self)
 
     __radd__ = __add__
 
     def __iadd__(self, other):
-        if isinstance(other, Distribution):
-            for k, v in other.items():
-                    self._d[k] += v
-            return self
-        else:
+        if not isinstance(other, Distribution):
             raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
                 self.__class__.__name__, other.__class__.__name__))
+
+        for k, v in other.items():
+                self._d[k] += v
+        return self
 
     def sort(self, rev=True):
         return sorted(self._d.items(), key=lambda x: x[1], reverse=rev)
 
+    def most_common(self, n=10):
+        return self.sort()[:n]
+
+    def least_common(self, n=10):
+        return self.sort(rev=False)[:n]
+
     def normalize(self):
         total = self.total()
         f = 1 / total
-        for k in self._d:
-            self._d[k] *= f
+        normalized = Distribution()
+        for k, v in self._d.items():
+            normalized[k] = v * f
+        return normalized
 
-    def most_common(self, n=10):
-        pass
+    def mean(self):
+        n = len(self._d)
+        return self.total() / n
 
-    def most_likely(self, n=10):
-        pass
+    def median(self):
+        l = self.sort()
+        middle = len(l) // 2
+        start = l[:middle]
+        end = l[middle:]
+        if len(l) % 2 == 0:
+            return (start[-1][1] + end[0][1]) / 2
+        else:
+            return l[middle][1]
 
+    def mode(self):
+        return max(self._d.items(), key=lambda x: x[1])
 
+    def variance(self):
+        # return sum([(v - self.mean())**2 for v in self._d.values()]) / len(self._d)
+        return statistics.pvariance(self._d.values())
+
+    def std_dev(self):
+        return statistics.pstdev(self._d.values())
+
+    def P(self, item):
+        return self._d.get(item, 0) / self.total()
 
 
 if __name__ == "__main__":
-    from pathlib import Path
+    # cookies!
+    # bowl1 = Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl 1')
+    # bowl2 = Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl 2')
 
-    def get_books(n=0):
-        data_dir = Path('/home/niels/projects/python/bouquet/data')
-        books = [b for b in data_dir.glob('*/*') if b.suffix == '.txt']
-        text = []
-        if n > len(books):
-            print('{} books available, using all books'.format(len(books)))
-        for idx, book in enumerate(books):
-            if n > 0 and idx >= n:
-                break
-            else:
-                with book.open() as f:
-                    text.append(f.read())
-        return text
+    # suite = Distribution([bowl1, bowl2])
+    # for dist in suite:
+    #     print('{}: {}'.format(dist.name, bayes_t(suite.P(dist),
+    #                                              dist.P('vanilla'),
+    #                                              (sum(d.P('vanilla') for d in
+    #                                                   suite) / 2))))
 
-    text = get_books()
-    corpus = Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
-    corpus.normalize()
-    print(corpus.sort(False))
+    # mnms
+    pre_95 = Distribution(brown=.3, yellow=.2, red=.2, green=.1, orange=.1,
+                          tan=.1, name='pre_95')
+    post_95 = Distribution(blue=.24, green=.20, orange=.16, yellow=.14,
+                           red=.13, brown=.13, name='post_95')
+    
+    bags = Distribution([pre_95, post_95])
+
+    # there are 2 bags, one from 1994 and one from 1996. You pick two m&ms, a
+    # yellow and a green one. the yellow m&m came from bag 1.
+    # What is the probability that bag 1 is from 1994?
+    # hypotheses:
+    #   A: bag 1 is pre_95, bag 2 is post 95
+    #   B: bag 1 is post_95, bag 2 is pre 95
+
+        # prior   likelihood    p*lh    posterior
+    # --  -----   ------------  ----    ---------
+    # A     .5    y:.2 * g:.2   .02    .02/.027
+    # B     .5    y:.14 * g:.1  .007    .007/.027
+
+    # hypo_A = ('A', bags.P(pre_95), pre_95.P('yellow'), post_95.P('green'))
+    # hypo_B = ('B', bags.P(post_95), post_95.P('yellow'), pre_95.P('green')) 
+
+    # def posterior(hypos):
+    #     c = sum([product(h[1:]) for h in hypos])
+    #     for h in hypos:
+    #         name, *ps = h
+    #         print(name, product(ps)/c)
+
+
+    # posterior([hypo_A, hypo_B])

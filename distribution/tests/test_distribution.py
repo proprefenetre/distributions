@@ -2,14 +2,28 @@
 # -*- coding: utf-8 -*-
 
 from distribution import distribution
+from pathlib import Path
+import statistics
 
 d1 = distribution.Distribution({'chocolate': 10, 'vanilla': 30})
 d2 = distribution.Distribution((('chocolate', 20), ('vanilla', 20)))
 d3 = distribution.Distribution(['chocolate'] * 30 + ['vanilla'] * 10)
 
-pd1 = distribution.ProbDistribution({'chocolate': 10, 'vanilla': 30})
-pd2 = distribution.ProbDistribution((('chocolate', 20), ('vanilla', 20)))
-pd3 = distribution.ProbDistribution(['chocolate'] * 30 + ['vanilla'] * 10)
+
+def get_books(n=0):
+    data_dir = Path('/home/niels/projects/python/bouquet/data')
+    books = [b for b in data_dir.glob('*/*') if b.suffix == '.txt']
+    text = []
+    if n > len(books):
+        print('{} books available, using all books'.format(len(books)))
+    for idx, book in enumerate(books):
+        if n > 0 and idx >= n:
+            break
+        else:
+            with book.open() as f:
+                text.append(f.read())
+    return text
+
 
 class TestDistribution:
 
@@ -28,10 +42,22 @@ class TestDistribution:
         new.update(d2)
         assert new['chocolate'] is 30
 
+    def test_mean(self):
+        text = get_books(3)
+        frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
+        assert frequency.mean() == statistics.mean(frequency.values())
 
-class TestProbDist:
+    # def test_mode(self):
+    #     text = get_books(3)
+    #     frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
+    #     assert frequency.mode() == statistics.mode(frequency.values())
 
-    def test_itialization(self):
-        assert pd1['chocolate'] == 0.25
-        assert pd2['chocolate'] == 0.5
-        assert pd3['chocolate'] == 0.75
+    def test_median(self):
+        text = get_books(3)
+        frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
+        assert frequency.median() == statistics.median(frequency.values())
+
+    def test_variance(self):
+        text = get_books(3)
+        frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
+        assert frequency.variance() == statistics.pvariance(frequency.values())

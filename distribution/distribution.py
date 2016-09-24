@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 
 from collections.abc import MutableMapping, Mapping
-import statistics
-import operator
 from functools import reduce
+import operator
+import random
+import statistics
+
 
 def bayes_t(prior, likelihood, c):
     return (prior * likelihood) / c
 
 
 def product(it):
-    return reduce(operator.mul, it) 
+    return reduce(operator.mul, it)
 
 
 def invert(mapping):
@@ -28,7 +30,7 @@ def invert(mapping):
         for k, v in items:
             if k == key:
                 vals.append(v)
-        new_map[key] = Distribution(dict(vals))
+        new_map[key] = Distribution(dict(vals)) 
     return new_map
 
 
@@ -86,7 +88,10 @@ class Distribution(MutableMapping):
             self.update(kwargs)
 
     def __repr__(self):
-        name = self.__class__.__name__
+        if hasattr(self, 'name'):
+            name = self.name
+        else:
+            name = self.__class__.__name__
         if not self:
             return '{}()'.format(name)
         else:
@@ -109,9 +114,10 @@ class Distribution(MutableMapping):
         if not isinstance(other, Distribution):
             raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
                 self.__class__.__name__, other.__class__.__name__))
-
-        self.update(other)
-        return Distribution(self)
+        new = Distribution()
+        new.update(other)
+        new.update(self)
+        return new
 
     __radd__ = __add__
 
@@ -168,47 +174,18 @@ class Distribution(MutableMapping):
     def P(self, item):
         return self._d.get(item, 0) / self.total()
 
+    def Ps(self, xs):
+        return [self.P(x) for x in xs]
+
+    def sample(self, n=30):
+        return random.sample(self._d.items(), n)
+
 
 if __name__ == "__main__":
     # cookies!
-    # bowl1 = Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl 1')
-    # bowl2 = Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl 2')
+    print(invert({'bowl1': Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl 1'),
+                  'bowl2': Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl 2')}))
 
     # suite = Distribution([bowl1, bowl2])
     # for dist in suite:
-    #     print('{}: {}'.format(dist.name, bayes_t(suite.P(dist),
-    #                                              dist.P('vanilla'),
-    #                                              (sum(d.P('vanilla') for d in
-    #                                                   suite) / 2))))
-
-    # mnms
-    pre_95 = Distribution(brown=.3, yellow=.2, red=.2, green=.1, orange=.1,
-                          tan=.1, name='pre_95')
-    post_95 = Distribution(blue=.24, green=.20, orange=.16, yellow=.14,
-                           red=.13, brown=.13, name='post_95')
-    
-    bags = Distribution([pre_95, post_95])
-
-    # there are 2 bags, one from 1994 and one from 1996. You pick two m&ms, a
-    # yellow and a green one. the yellow m&m came from bag 1.
-    # What is the probability that bag 1 is from 1994?
-    # hypotheses:
-    #   A: bag 1 is pre_95, bag 2 is post 95
-    #   B: bag 1 is post_95, bag 2 is pre 95
-
-        # prior   likelihood    p*lh    posterior
-    # --  -----   ------------  ----    ---------
-    # A     .5    y:.2 * g:.2   .02    .02/.027
-    # B     .5    y:.14 * g:.1  .007    .007/.027
-
-    # hypo_A = ('A', bags.P(pre_95), pre_95.P('yellow'), post_95.P('green'))
-    # hypo_B = ('B', bags.P(post_95), post_95.P('yellow'), pre_95.P('green')) 
-
-    # def posterior(hypos):
-    #     c = sum([product(h[1:]) for h in hypos])
-    #     for h in hypos:
-    #         name, *ps = h
-    #         print(name, product(ps)/c)
-
-
-    # posterior([hypo_A, hypo_B])
+    #     print('{}: {}'.format(dist.name, bayes_t(suite.P(dist), dist.P('vanilla'), (sum(d.P('vanilla') for d in suite) / 18))))

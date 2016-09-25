@@ -16,6 +16,9 @@ def product(it):
     return reduce(operator.mul, it)
 
 
+def join(*args):
+    return reduce(operator.add, args)
+
 def invert(mapping):
     """
     invert nested mappings, e.g.:
@@ -85,18 +88,20 @@ class Distribution(MutableMapping):
         if kwargs:
             if 'name' in kwargs:
                 self.name = kwargs.pop('name')
+            if 'joined' in kwargs:
+                self.joined = kwargs.pop('joined')
             self.update(kwargs)
 
     def __repr__(self):
         if hasattr(self, 'name'):
-            name = self.name
+            name = self.name.replace(' ', '_')
         else:
             name = self.__class__.__name__
         if not self:
             return '{}()'.format(name)
         else:
-            items = ', '.join(["('{}', {})".format(k, v) for k, v in iter(self._d.items())])
-            return '{}(({}))'.format(name, items)
+            items = ', '.join(["'{}': {}".format(k, v) for k, v in iter(self._d.items())])
+            return '{}({{{}}})'.format(name, items)
 
     def items(self):
         return self._d.items()
@@ -107,12 +112,31 @@ class Distribution(MutableMapping):
     def values(self):
         return self._d.values()
 
-    def total(self):
-        return sum(self.values())
+    def sort(self, rev=True):
+        return sorted(self._d.items(), key=lambda x: x[1], reverse=rev)
+
+    def most_common(self, n=10):
+        return self.sort()[:n]
+
+    def least_common(self, n=10):
+        return self.sort(rev=False)[:n]
+
+    def P(self, item):
+        return self._d.get(item, 0) / self.total()
+
+    def Ps(self, xs):
+        return [self.P(x) for x in xs]
+
+    def sample(self, n=30):
+        return random.sample(self._d.items(), n)
+
+    def _join(*args):
+        return reduce(operator.add, args)
 
     def __add__(self, other):
         if not isinstance(other, Distribution):
-            raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
+            # raise TypeError("Unsupported operand type(s) for +: '{}' and '{}'".format(
+            raise TypeError("can't add {} and {}".format(
                 self.__class__.__name__, other.__class__.__name__))
         new = Distribution()
         new.update(other)
@@ -130,14 +154,8 @@ class Distribution(MutableMapping):
                 self._d[k] += v
         return self
 
-    def sort(self, rev=True):
-        return sorted(self._d.items(), key=lambda x: x[1], reverse=rev)
-
-    def most_common(self, n=10):
-        return self.sort()[:n]
-
-    def least_common(self, n=10):
-        return self.sort(rev=False)[:n]
+    def total(self):
+        return sum(self.values())
 
     def normalize(self):
         total = self.total()
@@ -165,27 +183,31 @@ class Distribution(MutableMapping):
         return max(self._d.items(), key=lambda x: x[1])
 
     def variance(self):
-        # return sum([(v - self.mean())**2 for v in self._d.values()]) / len(self._d)
         return statistics.pvariance(self._d.values())
 
     def std_dev(self):
         return statistics.pstdev(self._d.values())
 
-    def P(self, item):
-        return self._d.get(item, 0) / self.total()
 
-    def Ps(self, xs):
-        return [self.P(x) for x in xs]
+class DistGroup(Distribution):
 
-    def sample(self, n=30):
-        return random.sample(self._d.items(), n)
+    def __init__(self, *args, **kwargs):
+        if args:
+            for arg in args[0]:
+                if not isinstance(arg, Distribution):
+                    raise ValueError('arguments should be Distributions')
+        super().__init__(*args, **kwargs)
+
+    def normalizer(self, item):
+        joined = reduce(operator.add, self._d.keys())
+        return joined.P(item)
 
 
 if __name__ == "__main__":
     # cookies!
-    print(invert({'bowl1': Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl 1'),
-                  'bowl2': Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl 2')}))
-
-    # suite = Distribution([bowl1, bowl2])
-    # for dist in suite:
-    #     print('{}: {}'.format(dist.name, bayes_t(suite.P(dist), dist.P('vanilla'), (sum(d.P('vanilla') for d in suite) / 18))))
+    cookies = DistGroup([Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl_1'),
+                         Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl_2')])
+    
+    data = 'vanilla'
+    print(max([(dist.name, cookies.P(dist) * dist.P(data) /
+                cookies.normalizer(data)) for dist in cookies], key=lambda x: x[1]))

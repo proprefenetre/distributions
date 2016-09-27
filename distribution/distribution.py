@@ -16,8 +16,9 @@ def product(it):
     return reduce(operator.mul, it)
 
 
-def join(*args):
-    return reduce(operator.add, args)
+def join(it):
+    return reduce(operator.add, it)
+
 
 def invert(mapping):
     """
@@ -33,7 +34,7 @@ def invert(mapping):
         for k, v in items:
             if k == key:
                 vals.append(v)
-        new_map[key] = Distribution(dict(vals)) 
+        new_map[key] = Distribution(dict(vals))
     return new_map
 
 
@@ -160,7 +161,7 @@ class Distribution(MutableMapping):
     def normalize(self):
         total = self.total()
         f = 1 / total
-        normalized = Distribution()
+        normalized = self.__class__()
         for k, v in self._d.items():
             normalized[k] = v * f
         return normalized
@@ -198,16 +199,34 @@ class DistGroup(Distribution):
                     raise ValueError('arguments should be Distributions')
         super().__init__(*args, **kwargs)
 
+    # def __getitem__(self, key):
+    #     for k, v in self._d.items():
+    #         if key == k.name:
+    #             return v
+
     def normalizer(self, item):
         joined = reduce(operator.add, self._d.keys())
         return joined.P(item)
 
+    def P(self, item):
+        if isinstance(item, str):
+            for k in self._d.keys():
+                if hasattr(k, 'name'):
+                    if k.name == item:
+                        return self._d[k] / self.total()
+        else:
+            return self._d.get(item, 0) / self.total()
+
+    def Ps(self, xs):
+        return [self.P(x) for x in xs]
 
 if __name__ == "__main__":
     # cookies!
     cookies = DistGroup([Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl_1'),
                          Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl_2')])
-    
     data = 'vanilla'
-    print(max([(dist.name, cookies.P(dist) * dist.P(data) /
-                cookies.normalizer(data)) for dist in cookies], key=lambda x: x[1]))
+    cookies = cookies.normalize()
+    print(cookies)
+    print(cookies.normalizer(data))
+    print(cookies.P('bowl_1'))
+    print(cookies.total())

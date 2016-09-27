@@ -47,11 +47,6 @@ class TestDistribution:
         frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
         assert frequency.mean() == statistics.mean(frequency.values())
 
-    # def test_mode(self):
-    #     text = get_books(3)
-    #     frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
-    #     assert frequency.mode() == statistics.mode(frequency.values())
-
     def test_median(self):
         text = get_books(3)
         frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
@@ -61,3 +56,23 @@ class TestDistribution:
         text = get_books(3)
         frequency = distribution.Distribution([s.strip('.,!?\'" ') for s in ' '.join(text).split()])
         assert frequency.variance() == statistics.pvariance(frequency.values())
+
+
+class TestDistGroup:
+
+    def test_cookie_problem(self):
+        bowl_1 = distribution.Distribution(['vanilla'] * 30 + ['chocolate'] * 10, name='bowl_1')
+        bowl_2 = distribution.Distribution(['vanilla'] * 20 + ['chocolate'] * 20, name='bowl_2')
+
+        # given these two bowls, what is the chance that a vanilla cookie comes
+        # from bowl_1?
+
+        cookies = distribution.DistGroup([bowl_1, bowl_2])
+        data = 'vanilla'
+        cookies.normalize()
+        probabilities = dict([(dist.name, (cookies.P(dist) * dist.P(data)) / cookies.normalizer(data)) for dist in cookies])
+        assert cookies.P('bowl_1') == 0.5, "prior probs are wrong"
+        assert cookies.normalizer(data) == 0.625, "overall prob is wrong"
+        assert len(probabilities) == 2, "not all distributions are present"
+        assert probabilities['bowl_1'] == 0.6, "probability for bowl_1 should be 0.6"
+        assert probabilities['bowl_2'] == 0.4, "probability for bowl_2 should be 0.4"

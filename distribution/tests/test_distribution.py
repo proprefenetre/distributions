@@ -76,10 +76,3 @@ class TestDistGroup:
         assert len(probabilities) == 2, "not all distributions are present"
         assert probabilities['bowl_1'] == 0.6, "probability for bowl_1 should be 0.6"
         assert probabilities['bowl_2'] == 0.4, "probability for bowl_2 should be 0.4"
-
-    def test_monty_hall(self):
-        door_A = distribution.Distribution(name='A')
-        door_B = distribution.Distribution(name='B')
-        door_C = distribution.Distribution(name='C')
-        dists = distribution.DistGroup()
-
